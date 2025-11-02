@@ -25,15 +25,30 @@ def create_tables():
             password TEXT
         )
     """)
-    # analyses table
+    # analyses (create basic first)
     c.execute("""
         CREATE TABLE IF NOT EXISTS analyses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             job_text TEXT,
             resume_text TEXT,
-            result_text TEXT,
             created_at TEXT
+        )
+    """)
+    # add result_text column if missing
+    c.execute("PRAGMA table_info(analyses)")
+    cols = [row[1] for row in c.fetchall()]
+    if "result_text" not in cols:
+        c.execute("ALTER TABLE analyses ADD COLUMN result_text TEXT")
+
+    # chats table (user_id, role, message, ts)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS chats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            role TEXT,
+            message TEXT,
+            ts TEXT
         )
     """)
     conn.commit()
@@ -44,7 +59,7 @@ def make_hash(password: str):
 
 def add_user(username: str, password: str):
     conn = get_conn()
-    c = conn.cursor()
+    c = conn.cursor();
     c.execute("INSERT INTO users(username, password) VALUES(?, ?)", (username, make_hash(password)))
     conn.commit()
     conn.close()
@@ -83,7 +98,33 @@ def get_latest_analysis(user_id: int):
     """, (user_id,))
     row = c.fetchone()
     conn.close()
-    return row  # (job_text, resume_text, result_text, created_at) or None
+    return row
+
+# ===== NEW: chat persistence =====
+def save_chat(user_id: int, role: str, message: str):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO chats(user_id, role, message, ts)
+        VALUES(?, ?, ?, ?)
+    """, (user_id, role, message, datetime.utcnow().isoformat()))
+    conn.commit()
+    conn.close()
+
+def load_chat(user_id: int, limit: int = 40):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("""
+        SELECT role, message, ts
+        FROM chats
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+    """, (user_id, limit))
+    rows = c.fetchall()
+    conn.close()
+    # newest first → reverse to show oldest first
+    return rows[::-1]
 
 # ====================== NLP utils ======================
 
@@ -195,6 +236,32 @@ def suggestion_rules(missing_skills):
         suggestions.append("Your resume already covers the main keywords. You can still mirror the exact wording from the job post.")
     return suggestions
 
+# ====================== Chatbot logic ======================
+
+def chatbot_reply(user_msg: str, last_analysis: dict | None):
+    msg_p = preprocess_text(user_msg)
+
+    if any(g in msg_p for g in ["hi", "hello", "hey"]):
+        return "Hi! 👋 I can tell you which keywords your resume is missing. Ask: **what am I missing?**"
+
+    if "what am i missing" in msg_p or "missing" in msg_p or "keywords" in msg_p:
+        if last_analysis and last_analysis.get("missing_skills"):
+            return "You're missing: " + ", ".join(last_analysis["missing_skills"])
+        else:
+            return "I don't have an analysis yet. Paste a job description and resume, then click **Analyze**."
+
+    if "recommend" in msg_p or "improve" in msg_p or "how to add" in msg_p or "how do i add" in msg_p:
+        if last_analysis:
+            sug = suggestion_rules(last_analysis.get("missing_skills", []))
+            return "Here are some suggestions:\n- " + "\n- ".join(sug)
+        else:
+            return "First give me a job description + resume so I know what's missing."
+
+    if "what can you do" in msg_p or "help" in msg_p:
+        return "I compare the job description to your resume using keyword matching + TF-IDF, then tell you what to add."
+
+    return "I can compare your resume to the job and list missing keywords. Try: **what am I missing?**"
+
 # ====================== Streamlit app ======================
 
 def main():
@@ -204,6 +271,9 @@ def main():
     if "auth" not in st.session_state:
         st.session_state.auth = False
         st.session_state.user = None
+
+    if "last_analysis" not in st.session_state:
+        st.session_state["last_analysis"] = None
 
     # ---- SIDEBAR AUTH ----
     st.sidebar.title("🔐 Account")
@@ -237,6 +307,7 @@ def main():
         if st.sidebar.button("Logout"):
             st.session_state.auth = False
             st.session_state.user = None
+            st.session_state["last_analysis"] = None
             st.rerun()
 
     # ---- MAIN ----
@@ -257,7 +328,6 @@ def main():
     if st.button("Analyze"):
         if job_desc.strip() and resume_txt.strip():
             analysis = compare_job_and_resume(job_desc, resume_txt)
-            # make a readable text to save
             result_text = (
                 f"Job skills: {', '.join(analysis['job_skills'])}\n"
                 f"Resume skills: {', '.join(analysis['resume_skills'])}\n"
@@ -286,9 +356,7 @@ def main():
             for s in suggestion_rules(analysis["missing_skills"]):
                 st.write("- " + s)
 
-            # store latest analysis in session for chatbot (next step)
             st.session_state["last_analysis"] = analysis
-
         else:
             st.warning("Please paste both job description and resume.")
 
@@ -306,6 +374,29 @@ def main():
             st.code(res_txt)
     else:
         st.write("No analysis saved yet.")
+
+    # ================== CHAT UI (DB-backed) ==================
+    st.divider()
+    st.subheader("💬 Chat with the Optimizer")
+
+    # load chat from DB
+    chat_rows = load_chat(st.session_state.user["id"], limit=40)
+    for role, message, ts in chat_rows:
+        if role == "user":
+            st.markdown(f"**You:** {message}")
+        else:
+            st.markdown(f"**Bot:** {message}")
+
+    user_msg = st.text_input("Your message", key="chat_input")
+    if st.button("Send"):
+        if user_msg.strip():
+            # save user msg
+            save_chat(st.session_state.user["id"], "user", user_msg)
+            # generate bot reply
+            last_analysis = st.session_state.get("last_analysis")
+            bot_msg = chatbot_reply(user_msg, last_analysis)
+            save_chat(st.session_state.user["id"], "bot", bot_msg)
+            st.rerun()
 
 if __name__ == "__main__":
     main()
