@@ -60,8 +60,8 @@ def main():
     else:
         st.sidebar.success(f"👋 Hello, {st.session_state.user['username']}")
         if st.sidebar.button("Logout", type="primary", use_container_width=True):
-            for k in ["auth","user","last_analysis","jd_text","resume_text","chat_input"]:
-                st.session_state[k] = None if k in ["user","last_analysis"] else ""
+            for k in ["auth", "user", "last_analysis", "jd_text", "resume_text", "chat_input"]:
+                st.session_state[k] = None if k in ["user", "last_analysis"] else ""
             st.session_state.auth = False
             st.rerun()
 
@@ -80,10 +80,11 @@ def main():
             if (kw_cols[i % 2]).button(kw.title() if i < 2 else kw, key=f"kw_{i}"):
                 st.session_state["chat_input"] = kw
                 st.experimental_rerun()
-        
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("**Mohammad Hamim**")
-        st.sidebar.markdown("**ID:** 202280090114")
+
+    # Add your name and ID at the bottom of the sidebar
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Mohammad Hamim**")
+    st.sidebar.markdown("**ID:** 202280090114")
 
     # ---- MAIN ----
     st.title("🤖 Resume Keyword Optimizer")
@@ -112,9 +113,9 @@ def main():
                 if jd and rs:
                     analysis = compare_job_and_resume(jd, rs)
                     result_text = (
-                        f"Job skills: {', '.join(analysis['job_skills'])}\n"
-                        f"Resume skills: {', '.join(analysis['resume_skills'])}\n"
-                        f"Missing skills: {', '.join(analysis['missing_skills'])}\n"
+                        f"Job skills: {', '.join(analysis['job_skills'])}\\n"
+                        f"Resume skills: {', '.join(analysis['resume_skills'])}\\n"
+                        f"Missing skills: {', '.join(analysis['missing_skills'])}\\n"
                     )
                     save_analysis(user_id, jd, rs, result_text)
                     st.session_state["last_analysis"] = analysis
@@ -127,9 +128,9 @@ def main():
                     summary.append(f"**Extra:** {len(analysis['extra_skills'])}")
                     sug = suggestion_rules(top_missing if top_missing else [])
                     if sug:
-                        summary.append("\n**Suggestions:**\n- " + "\n- ".join(sug))
+                        summary.append("\\n**Suggestions:**\\n- " + "\\n- ".join(sug))
 
-                    save_chat(user_id, "bot", "\n".join(summary))
+                    save_chat(user_id, "bot", "\\n".join(summary))
                     st.success("Analysis complete and saved ✅")
                     st.rerun()
                 else:
@@ -145,7 +146,7 @@ def main():
             if (user_msg or "").strip():
                 save_chat(user_id, "user", user_msg)
                 last_analysis = st.session_state.get("last_analysis")
-                bot_msg = chatbot_reply(user_msg, last_analysis)
+                bot_msg = chatbot_reply(user_msg, last_analysis, st.session_state.user["id"])  # Pass user_id here
                 save_chat(user_id, "bot", bot_msg)
                 st.rerun()
 
