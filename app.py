@@ -80,6 +80,10 @@ def main():
             if (kw_cols[i % 2]).button(kw.title() if i < 2 else kw, key=f"kw_{i}"):
                 st.session_state["chat_input"] = kw
                 st.experimental_rerun()
+        
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("**Mohammad Hamim**")
+        st.sidebar.markdown("**ID:** 202280090114")
 
     # ---- MAIN ----
     st.title("🤖 Resume Keyword Optimizer")
