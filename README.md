@@ -6,6 +6,9 @@ The **Resume Keyword Optimizer** is an intelligent tool designed to help job see
 
 ---
 
+## Deploy link
+Here is the Streamlit Link to project: https://resume-keyword-optimizer-bot-hamim.streamlit.app/ 
+
 ## Features
 
 ### 1. **Job Description & Resume Comparison**
