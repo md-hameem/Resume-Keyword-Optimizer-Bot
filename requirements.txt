@@ -1,0 +1,2 @@
+streamlit==1.17.0
+sqlite3==3.36.0
