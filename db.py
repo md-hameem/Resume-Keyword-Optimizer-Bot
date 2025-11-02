@@ -70,7 +70,7 @@ def save_analysis(user_id: int, job_text: str, resume_text: str, result_text: st
     c = conn.cursor()
     c.execute(
         """INSERT INTO analyses(user_id, job_text, resume_text, result_text, created_at)
-               VALUES(?, ?, ?, ?, ?)""",
+           VALUES(?, ?, ?, ?, ?)""",
         (user_id, job_text, resume_text, result_text, datetime.utcnow().isoformat())
     )
     conn.commit()
@@ -81,8 +81,8 @@ def get_latest_analysis(user_id: int):
     c = conn.cursor()
     c.execute(
         """SELECT id, job_text, resume_text, result_text, created_at
-               FROM analyses WHERE user_id = ?
-               ORDER BY id DESC LIMIT 1""",
+           FROM analyses WHERE user_id = ?
+           ORDER BY id DESC LIMIT 1""",
         (user_id,)
     )
     row = c.fetchone()
@@ -94,7 +94,7 @@ def list_analyses(user_id: int, limit: int = 20):
     c = conn.cursor()
     c.execute(
         """SELECT id, created_at FROM analyses
-               WHERE user_id = ? ORDER BY id DESC LIMIT ?""",
+           WHERE user_id = ? ORDER BY id DESC LIMIT ?""",
         (user_id, limit)
     )
     rows = c.fetchall()
@@ -106,7 +106,7 @@ def get_analysis_by_id(analysis_id: int):
     c = conn.cursor()
     c.execute(
         """SELECT id, job_text, resume_text, result_text, created_at
-               FROM analyses WHERE id = ?""",
+           FROM analyses WHERE id = ?""",
         (analysis_id,)
     )
     row = c.fetchone()
@@ -118,7 +118,7 @@ def save_chat(user_id: int, role: str, message: str):
     c = conn.cursor()
     c.execute(
         """INSERT INTO chats(user_id, role, message, ts)
-               VALUES(?, ?, ?, ?)""",
+           VALUES(?, ?, ?, ?)""",
         (user_id, role, message, datetime.utcnow().isoformat())
     )
     conn.commit()
@@ -129,9 +129,18 @@ def load_chat(user_id: int, limit: int = 100):
     c = conn.cursor()
     c.execute(
         """SELECT role, message, ts FROM chats
-               WHERE user_id = ? ORDER BY id DESC LIMIT ?""" ,
+           WHERE user_id = ? ORDER BY id DESC LIMIT ?""",
         (user_id, limit)
     )
     rows = c.fetchall()
     conn.close()
     return rows[::-1]
+
+# Fetch the user's name from the database based on user_id
+def get_user_name(user_id: int):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else "User"
